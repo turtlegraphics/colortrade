@@ -13,7 +13,7 @@ Graphs and their vertex color lists are specified by JSON, see examples in the g
 
 Use it like so:
 
-    colorings.py graphs/k4.json -showall
+    python colorings.py graphs/k4.json -showall
     
 
 
