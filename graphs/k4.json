@@ -1,9 +1,9 @@
 {
     "vertices": {
-	"0": ["red", "black","green"],
-	"1": ["red", "black","green"],
-	"2": ["red", "black","green"],
-	"3": ["red", "black","green"]
+	"0": ["orange", "black","green"],
+	"1": ["orange", "black","green"],
+	"2": ["orange", "black","green"],
+	"3": ["orange", "black","green"]
     },
     "layout": {
 	"0": [0,0],
