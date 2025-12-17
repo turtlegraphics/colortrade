@@ -81,6 +81,7 @@ Basically this was written by ChatGPT 5.1, with a little help from Bryan Clair.
 
 import math
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 import json
 import networkx as nx
 from itertools import combinations
@@ -185,6 +186,8 @@ def all_edge_colorings_with_vertex_constraints(G, vertex_colors):
             del edge_colors[edge_key]
 
     backtrack(0)
+    # order canonically
+    solutions.sort(key=lambda d: tuple(sorted(d.items())))
     return solutions
 
 def draw_edge_coloring(G, coloring, layout=None, node_size=600, width=3):
@@ -238,6 +241,59 @@ def draw_edge_coloring(G, coloring, layout=None, node_size=600, width=3):
 
     plt.axis("off")
 
+
+def tikz_from_coloring(G, coloring, layout, scale = 1.0, node_style="CTnode", edge_style="CTedge"):
+    """
+    Generate LaTeX TikZ code for an edge-colored graph.
+
+    Parameters
+    ----------
+    G : nx.Graph
+    coloring : dict[(u,v), color]
+    layout : dict[node, (x,y)]
+    node_style : str
+        TikZ style applied to all nodes.
+
+    Returns
+    -------
+    str : TikZ code (standalone snippet inside a tikzpicture).
+    """
+
+    if layout is None:
+        raise ValueError("layout is required to export TikZ coordinates")
+
+    def edge_color(u, v):
+        if (u, v) in coloring:
+            return coloring[(u, v)]
+        if (v, u) in coloring:
+            return coloring[(v, u)]
+        return "black"
+
+    lines = []
+    lines.append(r"\begin{tikzpicture}")
+
+    # Nodes
+    for n in G.nodes():
+        if n not in layout:
+            raise ValueError(f"Node {n!r} missing from layout")
+        x, y = layout[n]
+        x, y = float(x)*scale, float(y)*scale
+        name = f"v{str(n)}"
+        lines.append(rf"  \node[{node_style}] ({name}) at ({x:.4f},{y:.4f}) {{{n}}};")
+
+    # Need same mapping again for edges
+    node_name = {n: f"v{str(n)}" for n in G.nodes()}
+
+    # Edges
+    the_edges = list(G.edges())
+    the_edges.sort(key = lambda e: G.edges[e]['add_order'])
+    for u, v in the_edges:
+        c = edge_color(u, v)
+        # If colors are not TikZ-recognized names, you’ll need \definecolor in your preamble.
+        lines.append(rf"  \draw[{edge_style}, {c}] ({node_name[u]}) -- ({node_name[v]});")
+
+    lines.append(r"\end{tikzpicture}")
+    return "\n".join(lines)
 
 def draw_all_edge_colorings(G, solutions, node_size=600, width=3, layout=None):
     """
@@ -361,11 +417,11 @@ def read_graph_json(path):
     G = nx.Graph()
     G.add_nodes_from(vertex_colors.keys())
 
-    for edge in edges:
+    for i,edge in enumerate(edges):
         if len(edge) != 2:
             raise ValueError(f"Invalid edge entry (must have 2 items): {edge}")
         u, v = edge
-        G.add_edge(u, v)
+        G.add_edge(u, v, add_order = i)
 
     # Optional layout
     layout = None
@@ -374,6 +430,57 @@ def read_graph_json(path):
 
     return G, vertex_colors, layout
 
+def draw_bipartite_edgecolor_grid(G, U, V, coloring, ax=None,
+                                 show_labels=True, cell_size=1.0):
+    """
+    Draw a |U| x |V| grid. Cell (i,j) is the color of edge (U[i], V[j]) if present.
+
+    Parameters
+    ----------
+    G : nx.Graph
+    U, V : list
+        Node labels in each bipartition; U are rows (top-to-bottom), V are columns.
+    coloring : dict
+        Edge->color mapping, e.g. solutions[k] from the solver.
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(max(6, 0.6*len(V)), max(6, 0.6*len(U))))
+
+    # helper: handle undirected edge key either orientation
+    def edge_color(u, v):
+        if (u, v) in coloring:
+            return coloring[(u, v)]
+        if (v, u) in coloring:
+            return coloring[(v, u)]
+        return None
+
+    nrows, ncols = len(U), len(V)
+
+    # Draw cells
+    for i, u in enumerate(U):
+        for j, v in enumerate(V):
+            x = j * cell_size
+            y = (nrows - 1 - i) * cell_size  # put U[0] at top
+            c = edge_color(u, v) if G.has_edge(u, v) else None
+            face = c if c is not None else "white"
+            ax.add_patch(Rectangle((x, y), cell_size, cell_size,
+                                   facecolor=face, edgecolor="black", linewidth=1))
+
+    # Labels
+    if show_labels:
+        for i, u in enumerate(U):
+            y = (nrows - 1 - i + 0.5) * cell_size
+            ax.text(-0.1 * cell_size, y, str(u), ha="right", va="center")
+        for j, v in enumerate(V):
+            x = (j + 0.5) * cell_size
+            ax.text(x, nrows * cell_size + 0.1 * cell_size, str(v), ha="center", va="bottom")
+
+    ax.set_xlim(0, ncols * cell_size)
+    ax.set_ylim(0, nrows * cell_size)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    plt.show()
+    
 class EdgeColoringInstance:
     """
     Container for a graph edge-coloring instance:
@@ -388,6 +495,12 @@ class EdgeColoringInstance:
         self.G = G
         self.vertex_colors = vertex_colors
         self.layout = layout  # may be None
+        self.bipartite = nx.algorithms.bipartite.is_bipartite(self.G)
+        if self.bipartite:
+            # may throw exception AmbiguousSolution if graph is disconnected
+            U,V = nx.algorithms.bipartite.sets(self.G)
+            self.U = sorted(list(U))
+            self.V = sorted(list(V))
 
     @classmethod
     def from_json(cls, path, layout=None):
@@ -427,6 +540,39 @@ class EdgeColoringInstance:
             solutions = self.solve()
         draw_all_edge_colorings(self.G, solutions, layout=self.layout, **kwargs)
 
+    def draw_latex(self, solution, **kwargs):
+        """
+        Draw a single solution using the stored layout (if any).
+
+        Extra kwargs are passed, e.g.
+        node_style=.., edge_style=..
+        """
+        return tikz_from_coloring(self.G, solution, layout=self.layout, **kwargs)
+        
+    def get_bipartite_grid(self, solution):
+        assert(self.bipartite)
+        
+        def get_edge_color(u, v):
+            if (u, v) in solution:
+                return solution[(u, v)]
+            if (v, u) in solution:
+                return solution[(v, u)]
+            return None
+
+        return [[get_edge_color(u,v) for v in self.V] for u in self.U]
+
+        
+    def draw_bipartite_grid(self, solution, **kwargs):
+        """
+        Draw a single solution using the stored layout (if any).
+
+        Extra kwargs are passed to draw_bipartite_edgecolor_grid, e.g.
+        ax
+        show_labels
+        cell_size
+        """
+        assert(self.bipartite)
+        draw_bipartite_edgecolor_grid(self.G, self.U, self.V, solution, **kwargs)
 
 def is_colortrade(s1,s2):
     """Check if two colorings have any edges the same color.
@@ -481,19 +627,29 @@ if __name__ == "__main__":
     for sol in sols:
         print(sol)
 
+    print(square.draw_latex(sols[0]))
+    
     square.draw_colorings(sols)
     plt.gcf().canvas.manager.set_window_title("All colorings of the square")
     plt.show(block=False)
 
     # Compute color trade graph
-    k4 = EdgeColoringInstance.from_json("graphs/k4.json")
-    sols = k4.solve()
-    
-    k4.draw_colorings(sols)
-    plt.gcf().canvas.manager.set_window_title("All 4-colorings of K4")
+    k34 = EdgeColoringInstance.from_json("graphs/k34.json")
+    sols = k34.solve()
+
+    k34.draw_colorings(sols)
+    plt.gcf().canvas.manager.set_window_title("All 4-colorings of K3,4")
     plt.show(block=False)
     
     G = build_trade_graph(sols)
-    plt.figure(num="Color trade graph for K4")
+    plt.figure(num="Color trade graph for K3,4")
     nx.draw(G, with_labels=True)
+    plt.show(block=False)
+
+    k34.draw_bipartite_grid(sols[0])
+    plt.gcf().canvas.manager.set_window_title("Grid representation of K3,4 solution 0.")
     plt.show()
+    
+    k34grid = k34.get_bipartite_grid(sols[0])
+    print(k34grid)
+    
