@@ -15,19 +15,20 @@ else:
     sys.exit(1)
         
 answer = "LOSANGELES"
-#
-# Code: # = draw colored edge, no letter
-#       ? = draw next letter of solution word
-#       . = draw random letter
-#         = draw no letter
-#     1-6 = force color on this edge
+
+# Code for graph edges:
+#   # = draw colored edge, no letter
+#   ? = draw next letter of solution word
+#   . = draw random letter
+#     = draw no letter
+# 1-6 = force color on this edge
 
 graphs = [
     # (filename, c1, c2, codes, scale)
     #    ('cube', 0, 1, '############', 1),  # example graph
     ('wheel6', 1, 0, '...?###...?#', 1.3),
     ('square', 0, 1 , '#?#?', 1.3),
-    ('triangle', 0, 0, '.6.', 1.0),
+    ('triangle', 0, 0, '..3', 1.0),
     ('thetasub', 1, 0, '#?#?.#', 1.0),
     ('k4', 0, 3, '#.??..', 2.2),
     ('pinwheel6', 0, 0, '......', 0.7),
