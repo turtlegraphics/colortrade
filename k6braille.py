@@ -160,15 +160,20 @@ for col_no, coloring in enumerate(sols):
     else:
         six_braille['-'.join(all_letters)].add(col_no)
     
+print('='*80)
+print('Possible solutions using one set of colors in all six cells')
+print('='*80)
+
 for k in full_braille:
-    print('Possible full solution using coloring numbers',end=' ')
     for (i,c_on) in full_braille[k]:
         print(i,end=',')
     print()
     print(k)
 
 print()
-print('Possible top/bottom solutions')
+print('='*80)
+print('Possible solutions using one set of colors for the top row, and a second set for the bottom row')
+print('='*80)
 for k in sorted(list(half_braille)):
     print(k)
 #    print('using coloring numbers:')
@@ -178,13 +183,16 @@ for k in sorted(list(half_braille)):
 
     
 # Let's get some words!
-dfile = "/Users/bryan/Documents/Puzzles/Dictionaries/words-with-6-letters.txt"
+dfile = "words-with-6-letters.txt"
 dictionary = [x.strip() for x in open(dfile).readlines()]
 
 good_words = ['iguana','option','ethnic','gunman','sonata','zinnia','erotic','grotto','geneva','seneca','zydeco']
 
 print()
-print('Possible solutions using many different colorings')
+print('='*80)
+print('Using different colorings for each 2x3 cell:')
+print('all possible letters in each cell and words made from those')
+print('='*80)
 
 possible_solutions = set()
 for k in six_braille:
@@ -252,7 +260,11 @@ def has_one_color_on(square, word):
     return result
 
 print()
-print('All possible solutions using many different colorings')
+print('='*80)
+print('Which colorings to use for each word solution')
+print('including: if there is a color that is ON for all six cells')
+print('and if the word can be realized with only two colors per cell')
+print('='*80)
 
 #for (i,col_on) in colors(K6LatinSquare(sols[129]),"geneva"):
 #    print(i,col_on)
@@ -272,10 +284,15 @@ for word in sorted(list(possible_solutions)):
     print('   all sols:', ', '.join([str(j) for j in this_word_sols]))
 
 print()
-puzzle_words = ['grotto','gunman','option']
+print()
+print('='*80)
+print('Possible color usage, per cell, for selected words')
+print('='*80)
+
+puzzle_words = ['seneca','grotto','gunman','option']
 for word in puzzle_words:
     print()
-    print('='*10,word,'='*10)
+    print('-'*10,word,'-'*10)
     for i,coloring in enumerate(sols):
         square = K6LatinSquare(coloring)
         if len(mincolors(square,word)) == 6:
